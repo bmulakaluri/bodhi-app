@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bodhi — Voice To-Do</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f8f7f4;
+    --bg3: #f0ede7;
+    --text: #18180f;
+    --text2: #5a5a52;
+    --text3: #9a9890;
+    --border: rgba(0,0,0,0.09);
+    --border2: rgba(0,0,0,0.16);
+    --accent: #185FA5;
+    --accent-bg: #E6F1FB;
+    --accent-mid: #378ADD;
+    --accent-text: #0C447C;
+    --success: #3B6D11;
+    --success-bg: #EAF3DE;
+    --success-text: #27500A;
+    --warn-bg: #FAEEDA;
+    --warn-text: #633806;
+    --danger-bg: #FCEBEB;
+    --danger-text: #A32D2D;
+    --purple-bg: #EEEDFE;
+    --purple-text: #3C3489;
+    --r: 10px;
+    --r-lg: 16px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --bg2: #222220;
+      --bg3: #2a2a27;
+      --text: #f0ede8;
+      --text2: #a8a89e;
+      --text3: #6a6a60;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --accent: #378ADD;
+      --accent-bg: #042C53;
+      --accent-text: #85B7EB;
+      --success: #639922;
+      --success-bg: #173404;
+      --success-text: #97C459;
+      --warn-bg: #412402;
+      --warn-text: #FAC775;
+      --danger-bg: #501313;
+      --danger-text: #F09595;
+      --purple-bg: #26215C;
+      --purple-text: #AFA9EC;
+    }
+  }
+
+  html, body { min-height: 100vh; background: var(--bg3); }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+    min-height: 100vh;
+  }
+
+  .page { width: 100%; max-width: 680px; }
+
+  /* ── HEADER ── */
+  .page-header { margin-bottom: 28px; text-align: center; }
+  .page-title { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; color: var(--text); }
+  .page-subtitle { font-size: 14px; color: var(--text3); margin-top: 4px; }
+
+  /* ── VOICE WIDGET ── */
+  .voice-card {
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    border: 0.5px solid var(--border2);
+    padding: 28px 24px 22px;
+    margin-bottom: 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mic-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .mic-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--border2);
+    background: var(--bg2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    transition: all 0.2s ease;
+    position: relative;
+    outline: none;
+  }
+
+  .mic-btn:hover { border-color: var(--accent); background: var(--accent-bg); }
+  .mic-btn:active { transform: scale(0.95); }
+
+  .mic-btn.listening {
+    border-color: #E24B4A;
+    background: #FCEBEB;
+    animation: pulse-ring 1.5s infinite;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .mic-btn.listening { background: #501313; }
+  }
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(226,75,74,0.4); }
+    70% { box-shadow: 0 0 0 14px rgba(226,75,74,0); }
+    100% { box-shadow: 0 0 0 0 rgba(226,75,74,0); }
+  }
+
+  .mic-status {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    min-height: 20px;
+  }
+
+  .mic-status.recording { color: #A32D2D; }
+
+  .transcript-box {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px 16px;
+    min-height: 52px;
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.5;
+    text-align: left;
+    margin-bottom: 14px;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+
+  .transcript-box.active { border-color: var(--accent); }
+
+  .transcript-placeholder {
+    color: var(--text3);
+    font-style: italic;
+    pointer-events: none;
+    font-size: 13px;
+  }
+
+  .voice-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--r);
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s;
+    font-weight: 400;
+  }
+  .btn:hover { background: var(--bg2); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: transparent;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent-text); }
+
+  .btn-danger {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: transparent;
+  }
+
+  /* ── MANUAL INPUT ── */
+  .manual-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .task-input {
+    flex: 1;
+    font-family: inherit;
+    font-size: 14px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--r);
+    padding: 9px 14px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .task-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(55,138,221,0.15); }
+
+  .priority-select {
+    font-family: inherit;
+    font-size: 13px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--r);
+    padding: 9px 10px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    min-width: 100px;
+  }
+
+  /* ── STATS ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-num { font-size: 22px; font-weight: 600; color: var(--text); }
+  .stat-lbl { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ── FILTERS ── */
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-label { font-size: 12px; color: var(--text3); margin-right: 2px; }
+
+  .pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    border: 0.5px solid var(--border);
+    background: var(--bg2);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+  }
+  .pill.active { background: var(--accent); color: white; border-color: transparent; }
+  .pill:hover:not(.active) { background: var(--bg3); }
+
+  /* ── TODO LIST ── */
+  .todo-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .todo-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: border-color 0.12s, opacity 0.2s;
+  }
+  .todo-card:hover { border-color: var(--border2); }
+  .todo-card.done { opacity: 0.5; }
+  .todo-card.done .todo-task { text-decoration: line-through; color: var(--text3); }
+
+  .check-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border2);
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: transparent;
+    transition: all 0.15s;
+    margin-top: 1px;
+  }
+  .check-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .todo-card.done .check-btn { background: var(--success); border-color: var(--success); color: white; }
+
+  .todo-body { flex: 1; min-width: 0; }
+
+  .todo-task {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+
+  .todo-task-edit {
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    border: 0.5px solid var(--accent);
+    border-radius: 6px;
+    padding: 3px 8px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    margin-bottom: 4px;
+    box-shadow: 0 0 0 2px rgba(55,138,221,0.15);
+  }
+
+  .todo-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .source-chip {
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg2);
+    padding: 1px 7px;
+    border-radius: 10px;
+    border: 0.5px solid var(--border);
+  }
+
+  .priority-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.03em;
+  }
+
+  .p-high { background: var(--danger-bg); color: var(--danger-text); }
+  .p-medium { background: var(--warn-bg); color: var(--warn-text); }
+  .p-low { background: var(--success-bg); color: var(--success-text); }
+  .p-unknown { background: var(--bg3); color: var(--text3); }
+
+  .todo-time { font-size: 10px; color: var(--text3); }
+
+  .todo-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: auto; }
+
+  .icon-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text2);
+    transition: background 0.12s;
+  }
+  .icon-btn:hover { background: var(--bg2); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 44px; margin-bottom: 12px; opacity: 0.45; }
+  .empty-title { font-size: 16px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 9px 20px;
+    border-radius: 24px;
+    font-size: 13px;
+    transition: transform 0.22s ease;
+    z-index: 9999;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── AI THINKING ── */
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--accent-text);
+    background: var(--accent-bg);
+    border-radius: var(--r);
+    padding: 8px 14px;
+    margin-bottom: 12px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .dots span {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 1px;
+    animation: bounce 1.2s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── VOICE COMMANDS GUIDE ── */
+  .help-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    margin-top: 20px;
+  }
+  .help-title { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; }
+  .cmd-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; }
+  .cmd-phrase { background: var(--purple-bg); color: var(--purple-text); padding: 2px 8px; border-radius: 6px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .cmd-desc { color: var(--text3); padding-top: 1px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="page-title">🎙️ Bodhi</div>
+    <div class="page-subtitle">Speak tasks aloud — Bodhi captures, prioritizes, and saves them for you</div>
+  </div>
+
+  <!-- Voice card -->
+  <div class="voice-card">
+    <div class="mic-area">
+      <button class="mic-btn" id="micBtn" onclick="toggleListening()" title="Start / stop listening">
+        <span id="micIcon">🎙️</span>
+      </button>
+      <div class="mic-status" id="micStatus">Click the mic to start speaking</div>
+    </div>
+
+    <div class="transcript-box" id="transcriptBox">
+      <span class="transcript-placeholder" id="transcriptPlaceholder">Your words will appear here as you speak…</span>
+      <span id="transcriptText" style="display:none"></span>
+    </div>
+
+    <div class="ai-thinking" id="aiThinking">
+      <div class="dots"><span></span><span></span><span></span></div>
+      Processing your request with AI…
+    </div>
+
+    <div class="voice-actions">
+      <button class="btn btn-primary" id="addVoiceBtn" onclick="processTranscript()" disabled>➕ Add Task</button>
+      <button class="btn" onclick="clearTranscript()">✕ Clear</button>
+    </div>
+  </div>
+
+  <!-- Manual input -->
+  <div class="manual-row">
+    <input type="text" class="task-input" id="manualInput"
+      placeholder="Or type a task manually…"
+      onkeydown="if(event.key==='Enter') addManualTask()" />
+    <select class="priority-select" id="manualPriority">
+      <option value="unknown">No priority</option>
+      <option value="high">🔴 High</option>
+      <option value="medium">🟡 Medium</option>
+      <option value="low">🟢 Low</option>
+    </select>
+    <button class="btn btn-primary" onclick="addManualTask()">Add</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num" id="statTotal">0</div>
+      <div class="stat-lbl">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statPending" style="color:var(--accent)">0</div>
+      <div class="stat-lbl">Pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statDone" style="color:var(--success)">0</div>
+      <div class="stat-lbl">Done</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <span class="filter-label">Show:</span>
+    <button class="pill active" onclick="setFilter('all',this)">All</button>
+    <button class="pill" onclick="setFilter('pending',this)">Pending</button>
+    <button class="pill" onclick="setFilter('done',this)">Done</button>
+    <button class="pill" onclick="setFilter('high',this)">🔴 High</button>
+    <button class="pill" onclick="setFilter('medium',this)">🟡 Medium</button>
+    <button class="pill" onclick="setFilter('low',this)">🟢 Low</button>
+    <button class="pill" onclick="setFilter('voice',this)">🎙️ Voice</button>
+  </div>
+
+  <!-- Task list -->
+  <div class="todo-list" id="todoList"></div>
+
+  <!-- Voice commands guide -->
+  <div class="help-card">
+    <div class="help-title">💡 Voice commands</div>
+    <div class="cmd-grid">
+      <div class="cmd-item"><span class="cmd-phrase">"Add task…"</span><span class="cmd-desc">Add a new to-do</span></div>
+      <div class="cmd-item"><span class="cmd-phrase">"High priority…"</span><span class="cmd-desc">Add with high priority</span></div>
+      <div class="cmd-item"><span class="cmd-phrase">"Mark done…"</span><span class="cmd-desc">Complete a task by name</span></div>
+      <div class="cmd-item"><span class="cmd-phrase">"Delete…"</span><span class="cmd-desc">Remove a task by name</span></div>
+      <div class="cmd-item"><span class="cmd-phrase">"Clear all done"</span><span class="cmd-desc">Remove completed tasks</span></div>
+      <div class="cmd-item"><span class="cmd-phrase">"Read my tasks"</span><span class="cmd-desc">Speak pending tasks aloud</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── STATE ── */
+let todos = JSON.parse(localStorage.getItem('bodhi_todos') || '[]');
+let filter = 'all';
+let editingId = null;
+let recognition = null;
+let isListening = false;
+let finalTranscript = '';
+let interimTranscript = '';
+let speechSynth = window.speechSynthesis;
+
+/* ── SPEECH RECOGNITION (Web Speech API — same engine as Microsoft Word / Windows dictation) ── */
+function initSpeech() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById('micStatus').textContent = '⚠️ Speech recognition not supported. Use Chrome or Edge.';
+    document.getElementById('micBtn').disabled = true;
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micIcon').textContent = '⏹️';
+    document.getElementById('micStatus').textContent = 'Listening… speak now';
+    document.getElementById('micStatus').classList.add('recording');
+    document.getElementById('transcriptBox').classList.add('active');
+  };
+
+  recognition.onend = () => {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micIcon').textContent = '🎙️';
+    document.getElementById('micStatus').textContent = finalTranscript ? 'Done — review and add the task' : 'Click the mic to start speaking';
+    document.getElementById('micStatus').classList.remove('recording');
+    document.getElementById('transcriptBox').classList.remove('active');
+  };
+
+  recognition.onresult = (event) => {
+    interimTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript + ' ';
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+    const display = (finalTranscript + interimTranscript).trim();
+    showTranscript(display);
+    document.getElementById('addVoiceBtn').disabled = !display;
+  };
+
+  recognition.onerror = (event) => {
+    const msgs = {
+      'not-allowed': 'Microphone access denied. Allow it in browser settings.',
+      'no-speech': 'No speech detected. Try again.',
+      'network': 'Network error. Check connection.',
+      'audio-capture': 'No microphone found.'
+    };
+    document.getElementById('micStatus').textContent = '⚠️ ' + (msgs[event.error] || event.error);
+    isListening = false;
+  };
+}
+
+function showTranscript(text) {
+  const ph = document.getElementById('transcriptPlaceholder');
+  const tx = document.getElementById('transcriptText');
+  if (text) {
+    ph.style.display = 'none';
+    tx.style.display = '';
+    tx.textContent = text;
+  } else {
+    ph.style.display = '';
+    tx.style.display = 'none';
+  }
+}
+
+function toggleListening() {
+  if (!recognition) return;
+  if (isListening) {
+    recognition.stop();
+  } else {
+    finalTranscript = '';
+    interimTranscript = '';
+    showTranscript('');
+    document.getElementById('addVoiceBtn').disabled = true;
+    recognition.start();
+  }
+}
+
+function clearTranscript() {
+  finalTranscript = '';
+  interimTranscript = '';
+  showTranscript('');
+  document.getElementById('addVoiceBtn').disabled = true;
+  if (isListening) recognition.stop();
+}
+
+/* ── AI PROCESSING ── */
+async function processTranscript() {
+  const text = (finalTranscript + interimTranscript).trim();
+  if (!text) return;
+  if (isListening) recognition.stop();
+
+  document.getElementById('addVoiceBtn').disabled = true;
+  document.getElementById('aiThinking').classList.add('visible');
+
+  try {
+    const handled = await handleVoiceCommand(text);
+    if (!handled) {
+      await aiAddTask(text);
+    }
+  } catch (e) {
+    fallbackAddTask(text);
+  }
+
+  document.getElementById('aiThinking').classList.remove('visible');
+  clearTranscript();
+}
+
+async function handleVoiceCommand(text) {
+  const t = text.toLowerCase();
+
+  if (t.includes('clear all done') || t.includes('remove completed') || t.includes('delete done')) {
+    const before = todos.length;
+    todos = todos.filter(x => !x.done);
+    saveTodos();
+    showToast(`Cleared completed tasks`);
+    speak('All done tasks have been cleared.');
+    return true;
+  }
+
+  if (t.match(/^(read|list|what are|show me|tell me).*(tasks|to.?dos|pending)/i)) {
+    const pending = todos.filter(x => !x.done);
+    if (pending.length === 0) {
+      speak('You have no pending tasks. Great job!');
+    } else {
+      const summary = `You have ${pending.length} pending task${pending.length > 1 ? 's' : ''}. ${pending.slice(0, 3).map((t, i) => `Number ${i+1}: ${t.task}`).join('. ')}${pending.length > 3 ? `. And ${pending.length - 3} more.` : '.'}`;
+      speak(summary);
+      showToast('Reading your tasks…');
+    }
+    return true;
+  }
+
+  const markMatch = t.match(/(?:mark|complete|finish|done|i finished|i completed)\s+(.+)/i);
+  if (markMatch) {
+    const query = markMatch[1].toLowerCase().replace(/\bthe\b|\btask\b/g, '').trim();
+    const todo = todos.find(x => !x.done && x.task.toLowerCase().includes(query.substring(0, 20)));
+    if (todo) {
+      todo.done = true;
+      saveTodos();
+      showToast(`Marked done: ${todo.task.substring(0, 40)}`);
+      speak('Task marked as complete.');
+      return true;
+    }
+  }
+
+  const deleteMatch = t.match(/(?:delete|remove|cancel)\s+(.+)/i);
+  if (deleteMatch) {
+    const query = deleteMatch[1].toLowerCase().replace(/\btask\b/g, '').trim();
+    const idx = todos.findIndex(x => x.task.toLowerCase().includes(query.substring(0, 20)));
+    if (idx !== -1) {
+      const removed = todos.splice(idx, 1)[0];
+      saveTodos();
+      showToast(`Deleted: ${removed.task.substring(0, 40)}`);
+      speak('Task deleted.');
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function aiAddTask(text) {
+  const prompt = `You are a task parser. Convert this voice input into a structured to-do item.
+
+Voice input: "${text}"
+
+Extract:
+1. The task — a clear, concise action description (fix grammar, make imperative like "Schedule meeting with John")
+2. Priority: "high" (urgent/ASAP), "medium" (soon), "low" (whenever), or "unknown"
+
+Respond ONLY with a JSON object like:
+{"task": "...", "priority": "..."}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const data = await res.json();
+  const raw = data.content?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  addTodo({
+    task: parsed.task || text,
+    priority: parsed.priority || 'unknown',
+    source: 'voice',
+    sender: 'You (voice)',
+    date: now()
+  });
+  speak('Task added: ' + (parsed.task || text));
+}
+
+function fallbackAddTask(text) {
+  let priority = 'unknown';
+  const t = text.toLowerCase();
+  if (/urgent|asap|immediately|critical|right now|today/i.test(t)) priority = 'high';
+  else if (/soon|this week|medium/i.test(t)) priority = 'medium';
+  else if (/low|whenever|no rush/i.test(t)) priority = 'low';
+
+  const clean = text
+    .replace(/^(please |can you |could you |hey |add task |add |remind me to )/i, '')
+    .replace(/ with (high|medium|low) priority$/i, '')
+    .trim();
+
+  addTodo({ task: clean || text, priority, source: 'voice', sender: 'You (voice)', date: now() });
+}
+
+/* ── MANUAL ADD ── */
+function addManualTask() {
+  const inp = document.getElementById('manualInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  const priority = document.getElementById('manualPriority').value;
+  addTodo({ task: val, priority, source: 'manual', sender: 'You', date: now() });
+  inp.value = '';
+}
+
+/* ── TODOS ── */
+function addTodo(data) {
+  todos.unshift({ id: uid(), done: false, ...data });
+  saveTodos();
+  showToast('Task added ✓');
+}
+
+function toggleDone(id) {
+  const t = todos.find(x => x.id === id);
+  if (t) { t.done = !t.done; saveTodos(); }
+}
+
+function deleteTodo(id) {
+  todos = todos.filter(x => x.id !== id);
+  saveTodos();
+  showToast('Removed');
+}
+
+function startEdit(id) { editingId = id; renderTodos(); }
+
+function saveEdit(id) {
+  const inp = document.getElementById('ei-' + id);
+  if (inp && inp.value.trim()) {
+    const t = todos.find(x => x.id === id);
+    if (t) t.task = inp.value.trim();
+  }
+  editingId = null;
+  saveTodos();
+}
+
+function cancelEdit() { editingId = null; renderTodos(); }
+
+function saveTodos() {
+  localStorage.setItem('bodhi_todos', JSON.stringify(todos));
+  updateStats();
+  renderTodos();
+}
+
+function updateStats() {
+  const pending = todos.filter(t => !t.done).length;
+  document.getElementById('statTotal').textContent = todos.length;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statDone').textContent = todos.length - pending;
+}
+
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderTodos();
+}
+
+function renderTodos() {
+  let items = todos;
+  if (filter === 'pending') items = todos.filter(t => !t.done);
+  else if (filter === 'done') items = todos.filter(t => t.done);
+  else if (filter === 'high') items = todos.filter(t => t.priority === 'high');
+  else if (filter === 'medium') items = todos.filter(t => t.priority === 'medium');
+  else if (filter === 'low') items = todos.filter(t => t.priority === 'low');
+  else if (filter === 'voice') items = todos.filter(t => t.source === 'voice');
+
+  const list = document.getElementById('todoList');
+
+  if (items.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🎯</div>
+      <div class="empty-title">No tasks here</div>
+      <div class="empty-sub">${filter === 'all' ? 'Click the mic or type a task to get started.' : 'Try another filter or add a task.'}</div>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(t => `
+    <div class="todo-card ${t.done ? 'done' : ''}">
+      <button class="check-btn" onclick="toggleDone('${t.id}')">${t.done ? '✓' : ''}</button>
+      <div class="todo-body">
+        ${editingId === t.id
+          ? `<input class="todo-task-edit" id="ei-${t.id}" value="${esc(t.task)}"
+              onkeydown="if(event.key==='Enter')saveEdit('${t.id}');if(event.key==='Escape')cancelEdit()">`
+          : `<div class="todo-task" ondblclick="startEdit('${t.id}')">${esc(t.task)}</div>`
+        }
+        <div class="todo-meta">
+          <span class="source-chip">${t.source === 'voice' ? '🎙️' : '⌨️'} ${esc(t.sender || 'You')}</span>
+          <span class="priority-badge p-${t.priority || 'unknown'}">${priLabel(t.priority)}</span>
+          ${t.date ? `<span class="todo-time">${t.date}</span>` : ''}
+        </div>
+      </div>
+      <div class="todo-actions">
+        ${editingId === t.id
+          ? `<button class="icon-btn" onclick="saveEdit('${t.id}')">💾</button>
+             <button class="icon-btn" onclick="cancelEdit()">✕</button>`
+          : `<button class="icon-btn" onclick="startEdit('${t.id}')" title="Edit">✏️</button>
+             <button class="icon-btn" onclick="deleteTodo('${t.id}')" title="Delete">🗑️</button>`
+        }
+      </div>
+    </div>
+  `).join('');
+
+  if (editingId) {
+    const inp = document.getElementById('ei-' + editingId);
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+
+/* ── SPEECH OUTPUT ── */
+function speak(text) {
+  if (!speechSynth) return;
+  speechSynth.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.05;
+  utt.pitch = 1;
+  speechSynth.speak(utt);
+}
+
+/* ── HELPERS ── */
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function uid() { return Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+function now() {
+  return new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function priLabel(p) {
+  if (!p || p === 'unknown') return 'No priority';
+  return { high: '🔴 High', medium: '🟡 Medium', low: '🟢 Low' }[p] || p;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ── KEYBOARD SHORTCUT: Space to toggle mic ── */
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' && e.ctrlKey) {
+    e.preventDefault();
+    toggleListening();
+  }
+});
+
+/* ── INIT ── */
+initSpeech();
+updateStats();
+renderTodos();
+</script>
+</body>
+</html>
